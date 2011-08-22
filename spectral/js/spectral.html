@@ -1,0 +1,159 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html>
+  <!--
+  Copyright (c) 2011 Dennis Jarosch. All rights reserved.
+  Use of this source code is governed by a BSD-style license that can be
+  found in the LICENSE file.
+  -->
+<head>
+	<title>JavaScript Spectral Analysis</title>
+	<script type="text/javascript" src="lib/chunk_ab.js"></script>
+	<script type="text/javascript" src="lib/complex.js"></script>
+	<script type="text/javascript" src="lib/analysis.js"></script>
+	<script type="text/javascript">		
+		var worker;
+		var d;	
+		counter = 1;
+
+		function onResult(event) {
+			var ed = new Date();
+			var duration = ed.getTime() - d.getTime();		
+
+			var result_field = document.getElementById('result_field');
+/*
+			result_field.innerHTML = "Completed, time was " + duration  
+				+ " ms (" + (duration / 1000.0) + " seconds)";
+*/
+			result_field.innerHTML = result_field.innerHTML 
+				+ counter++ + ". Completed, time was " + duration  
+				+ " ms (" + (duration / 1000.0) + " seconds)<br>";
+
+			document.body.style.cursor = "default";
+		}
+
+		function pageLoaded() {
+			worker = new Worker("worker_arraybuffer.js");
+			worker.addEventListener("message", onResult, false);
+		}
+
+/*
+		// in samples
+		var nWindow = 256;
+		var overlap = 128;
+
+		function getFile(url) {
+			var moz = false;
+			var req = new XMLHttpRequest();
+			req.open('GET', url, false);
+			// try to get data as ArrayBuffer, or at least unparsed
+			if (req.hasOwnProperty("responseType"))
+				req.responseType="arraybuffer";
+			else if (req.mozResponseArrayBuffer == null)
+				moz = true;
+			else
+				throw "Aborting, ArrayBuffers are not supported."
+
+			req.send(null);
+
+			if (moz)
+				return req.mozResponseArrayBuffer;
+
+			return req.response;
+		}
+
+		function analyze(data) {
+			var chunk = new Chunk();
+	
+			chunk.read(data);
+
+			var bytesPerWin = nWindow * chunk.fmt.blockAlign; 
+			var incr 	    = (nWindow - overlap) * chunk.fmt.blockAlign;
+			var iterations  = Math.floor((chunk.data.size - bytesPerWin) / incr) + 1;
+
+			if ((chunk.data.size - bytesPerWin) % incr)
+				++iterations;
+
+			// we support only 2 channels (stereo) for now
+			leftChannel  = new Array(nWindow);
+			rightChannel = new Array(nWindow);
+
+			var left, right;
+			var resultLeft, resultRight;
+			var ampsLeft, ampsRight;
+			var complex;
+			var dataOffset = 0; //chunk.data.offset;
+
+			if (chunk.fmt.bitsPerSample == 16)
+			{
+				var dataView = new Int16Array(data, chunk.data.offset);
+
+				var getLeftData  = getLeftChannel16Bit;
+				var getRightData = getRightChannel16Bit;
+			}
+			else if (chunk.fmt.bitsPerSample == 24)
+			{
+				var dataView = new Uint8Array(data, chunk.data.offset);
+
+				dataView.samplingMask = Math.pow(2, chunk.fmt.bitsPerSample) - 1;
+				dataView.twoCompMask  = 1 << (chunk.fmt.bitsPerSample - 1);
+
+				var getLeftData  = getLeftChannel24Bit;
+				var getRightData = getRightChannel24Bit;
+			}
+	
+			for (var i = 0; i < iterations - 1; i++)
+			{
+				for (var n = 0; n < nWindow; n++)
+				{
+					left  = getLeftData(dataView, n, dataOffset);
+					right = getRightData(dataView, n, dataOffset);			
+	
+					leftChannel[n]  = new Complex(0, left * hann(n, nWindow - 1));
+					rightChannel[n] = new Complex(0, right * hann(n, nWindow - 1));
+				}
+
+				// Cooley-Tukey FFT
+				resultLeft  = fft(leftChannel);
+				resultRight = fft(rightChannel);
+
+				ampsLeft  = amplitude(resultLeft);	
+				ampsRight = amplitude(resultRight);	
+
+				dataOffset += incr;
+			}
+		}
+*/	
+
+		function start(fileName) {
+			document.body.style.cursor = "wait";
+
+			d = new Date();
+/*
+			// get the file
+			var data = getFile(fileName);
+
+			analyze(data);
+			onResult(0);
+*/
+			worker.postMessage(fileName);
+		}	
+	</script>
+
+</head>
+
+<body onload="pageLoaded()">
+	<h1>Spectral Analysis</h1>
+	<p>Click to begin analysis.</p>
+	
+	<div id="button">
+		<button onclick="start('LMAI.wav')">Analyze 'LMAI'</button>
+		<button onclick="start('LMAIntro.wav')">Analyze 'LMAIntro.wav'</button>
+		<button onclick="start('The Blooze.wav')">Analyze 'The Blooze'</button>
+		<button onclick="start('Sold His Soul.wav')">Analyze 'Sold His Soul'</button>
+	</div>
+	
+	<h2>Status</h2>
+	<div id="result_field"></div>
+</body>
+</html>
