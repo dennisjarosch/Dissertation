@@ -1,0 +1,398 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html>
+  <!--
+  This is a port of the infamous "glxgears" demo by Brian Paul to WebGL.
+
+  Copyright (c) 2011 Dennis Jarosch. All rights reserved.
+  Use of this source code is governed by a BSD-style license that can be
+  found in the LICENSE file.
+  -->
+<head>
+<title>WebGL Gears</title>
+
+
+<!-- sylvester library for vertex math, etc. -->
+<script type="text/javascript" src="lib/sylvester.js"></script>
+<script type="text/javascript" src="lib/glUtils.js"></script>
+<script type="text/javascript" src="lib/webgl-utils.js"></script>
+<script type="text/javascript" src="lib/gear.js"></script>
+
+<!-- Fragment and vertex shadeshaderProgram.vertexPositionAttributer scripts -->
+<script id="shader-fs" type="x-shader/x-fragment"> 
+	#ifdef GL_ES
+		precision highp float;
+	#endif
+
+	varying vec4 vColor;
+	varying vec3 vLightWeighting;
+
+	void main(void) 
+	{
+		gl_FragColor = vec4(vColor.rgb * vLightWeighting, vColor.a);
+	}
+</script> 
+ 
+<script id="shader-vs" type="x-shader/x-vertex"> 
+	attribute vec3 aVertexPosition;
+	attribute vec4 aVertexColor;
+	attribute vec3 aVertexNormal;
+
+	uniform mat4 uMVMatrix;
+	uniform mat4 uPMatrix;
+	uniform mat4 uNMatrix;
+
+	uniform vec3 uLightingDirection;
+  	uniform vec3 uDirectionalColor;
+
+	varying vec4 vColor;
+	varying vec3 vLightWeighting;
+
+	void main(void) 
+	{
+		gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+		vColor = aVertexColor;
+
+		// lighting
+		vec4 transformedNormal = uNMatrix * vec4(aVertexNormal, 1.0);
+		float directionalLightWeighting = max(dot(transformedNormal.xyz, uLightingDirection), 0.0);
+		vLightWeighting = uDirectionalColor * directionalLightWeighting;
+	}
+</script> 
+  
+
+<script type="text/javascript"> 
+// global variables
+var gl;
+var shaderProgram;
+var mvMatrix; 
+var pMatrix;
+var mvMatrixStack = [];
+
+var frames = 0;
+var t0 = -1;
+
+var angle = 0.0;
+var view_rotx = 20.0
+var view_roty = 30.0
+var view_rotz = 0.0;
+var pressedKeys = Object();
+
+var gear1;
+var gear2;
+var gear3;
+var lightPos = Vector.create([5.0, 5.0, 10.0]);
+
+function initGL(canvas) {
+	try 
+	{
+//		gl = WebGLDebugUtils.makeDebugContext(canvas.getContext("experimental-webgl"));
+		gl = canvas.getContext("experimental-webgl");
+		gl.viewportWidth = canvas.width;
+		gl.viewportHeight = canvas.height;
+		gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);
+
+		gl.clearColor(0.0, 0.0, 0.0, 1.0);
+		gl.clearDepth(1.0);
+		gl.enable(gl.DEPTH_TEST);
+		gl.depthFunc(gl.LEQUAL);
+	} 
+	catch(e) 
+	{
+		alert("Unable to initialize WebGL.");	
+	}
+}
+ 
+
+function getShader(id) {
+	var shaderScript = document.getElementById(id);
+
+	if (!shaderScript)
+		return null;
+
+	var theSource = "";
+	var currentChild = shaderScript.firstChild;
+
+	while(currentChild) 
+	{
+		if (currentChild.nodeType == 3) 
+			theSource += currentChild.textContent;
+
+		currentChild = currentChild.nextSibling;
+	}
+
+	// create shader based on MIME type
+	var shader;
+
+	if (shaderScript.type == "x-shader/x-fragment")
+		shader = gl.createShader(gl.FRAGMENT_SHADER);
+	else if (shaderScript.type == "x-shader/x-vertex")
+		shader = gl.createShader(gl.VERTEX_SHADER);
+	else
+		return null;  // Unknown shader type
+
+	gl.shaderSource(shader, theSource);
+	gl.compileShader(shader);
+
+	if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
+	{
+		alert("An error occurred compiling the shaders: " + gl.getShaderInfoLog(shader));
+		return null;
+	}
+
+	return shader;
+}
+
+function initShaders() {
+	var fragmentShader = getShader("shader-fs");
+	var vertexShader = getShader("shader-vs");
+
+	shaderProgram = gl.createProgram();
+	gl.attachShader(shaderProgram, vertexShader);
+	gl.attachShader(shaderProgram, fragmentShader);
+	gl.linkProgram(shaderProgram);
+
+	if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+	  alert("Could not initialize shaders");
+	}
+
+	gl.useProgram(shaderProgram);
+
+	shaderProgram.vertexPositionAttribute = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+	gl.enableVertexAttribArray(shaderProgram.vertexPositionAttribute);
+
+	shaderProgram.vertexNormalAttribute = gl.getAttribLocation(shaderProgram, "aVertexNormal");
+	gl.enableVertexAttribArray(shaderProgram.vertexNormalAttribute);
+
+	shaderProgram.vertexColorAttribute = gl.getAttribLocation(shaderProgram, "aVertexColor");
+    gl.enableVertexAttribArray(shaderProgram.vertexColorAttribute);
+
+	shaderProgram.pMatrixUniform 	= gl.getUniformLocation(shaderProgram, "uPMatrix");
+	shaderProgram.mvMatrixUniform 	= gl.getUniformLocation(shaderProgram, "uMVMatrix");
+	shaderProgram.nMatrixUniform 	= gl.getUniformLocation(shaderProgram, "uNMatrix");
+
+	// lighting
+	shaderProgram.lightingDirectionUniform 	= gl.getUniformLocation(shaderProgram, "uLightingDirection");
+    shaderProgram.directionalColorUniform 	= gl.getUniformLocation(shaderProgram, "uDirectionalColor");
+}
+ 
+
+function loadIdentity() {
+	mvMatrix = Matrix.I(4);
+}
+  
+
+function multMatrix(m) {
+    mvMatrix = mvMatrix.x(m);
+}
+  
+
+function mvTranslate(v) {
+	var m = Matrix.Translation($V([v[0], v[1], v[2]])).ensure4x4();
+	multMatrix(m);
+}
+
+
+function mvRotate(ang, v) {
+	var arad = ang * Math.PI / 180.0;
+	var m = Matrix.Rotation(arad, $V([v[0], v[1], v[2]])).ensure4x4();
+	
+	multMatrix(m);
+}
+
+
+function mvPushMatrix(m) {
+	if (m) 
+	{
+		mvMatrixStack.push(m.dup());
+		mvMatrix = m.dup();
+	} 
+	else 
+	{
+		mvMatrixStack.push(mvMatrix.dup());
+	}
+}
+
+
+function mvPopMatrix() 
+{
+	if (mvMatrixStack.length == 0) 
+		throw "Invalid popMatrix!";
+
+	mvMatrix = mvMatrixStack.pop();
+	return mvMatrix;
+}
+ 
+
+function perspective(fovy, aspect, znear, zfar) {
+	pMatrix = makePerspective(fovy, aspect, znear, zfar);
+}
+ 
+
+function setMatrixUniforms() {
+	gl.uniformMatrix4fv(shaderProgram.pMatrixUniform, false, new Float32Array(pMatrix.flatten()));
+	gl.uniformMatrix4fv(shaderProgram.mvMatrixUniform, false, new Float32Array(mvMatrix.flatten()));
+
+	var normalMatrix = mvMatrix.inverse();
+	normalMatrix = normalMatrix.transpose();
+	gl.uniformMatrix4fv(shaderProgram.nMatrixUniform, false, new Float32Array(normalMatrix.flatten()));
+}
+ 
+ 
+function drawScene() {
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+ 
+    perspective(25, gl.viewportWidth / gl.viewportHeight, 5, 60.0);
+    loadIdentity();
+
+	// lighting
+	var normalizedLightPos = lightPos.toUnitVector();
+	var flatLight = normalizedLightPos.flatten();
+	gl.uniform3fv(shaderProgram.lightingDirectionUniform, flatLight);
+	gl.uniform3f(shaderProgram.directionalColorUniform, 1.0, 1.0, 1.0);
+
+    mvTranslate([0.0, 0.0, -40.0]);	
+    mvRotate(view_rotx, [1.0, 0.0, 0.0]);
+    mvRotate(view_roty, [0.0, 1.0, 0.0]);
+
+	// gear1
+	mvPushMatrix();
+    mvTranslate([-3.0, -2.0, 0.0]);	
+	mvRotate(angle, [0.0, 0.0, 1.0]);
+
+    setMatrixUniforms();
+	gear1.draw(gl, shaderProgram);
+	mvPopMatrix();
+
+	// gear2
+	mvPushMatrix();
+    mvTranslate([3.1, -2.0, 0.0]);
+	mvRotate(-2.0 * angle - 9.0, [0.0, 0.0, 1.0]);
+
+    setMatrixUniforms();
+	gear2.draw(gl, shaderProgram);
+	mvPopMatrix();
+
+	// gear3
+	mvPushMatrix();
+	mvTranslate([-3.1, 4.2, 0.0]);
+	mvRotate(-2.0 * angle - 25.0, [0.0, 0.0, 1.0]);	
+
+    setMatrixUniforms();
+	gear3.draw(gl, shaderProgram);
+	mvPopMatrix();
+}
+
+
+function handleKeyDown(event) {
+	pressedKeys[event.keyCode] = true;
+}
+
+
+function handleKeyUp(event) {
+	pressedKeys[event.keyCode] = false;
+}
+
+
+function handleKeyPress() {
+	if (pressedKeys[37]) 
+	{
+		// Left cursor key
+		view_roty += 5.0;
+	}
+	if (pressedKeys[39]) 
+	{
+		// Right cursor key
+		view_roty -= 5.0;
+	}
+	if (pressedKeys[38]) 
+	{
+		// Up cursor key
+		view_rotx += 5.0;
+	}
+	if (pressedKeys[40]) 
+	{
+		// Down cursor key
+		view_rotx -= 5.0;
+	}
+}
+
+
+function eventLoop() 
+{
+	handleKeyPress();
+
+	angle = angle + 2.0;
+
+	drawScene();
+
+	// calc framerate
+	if (t0 < 0)
+		t0 = new Date().getTime();
+
+	var t = new Date().getTime();
+
+	frames++;
+
+	if (t - t0 >= 5000)
+	{
+		var secs = (t - t0) / 1000.0;
+		var fps  = frames / secs;
+
+		var label = document.getElementById('framerate');
+/*
+		label.innerHTML += frames + " frames in " + secs.toFixed(1) 
+						+ " seconds = " + fps.toFixed(3) + " fps<br>";
+*/
+		label.innerHTML = frames + " frames in " + secs.toFixed(1) 
+						+ " seconds = " + fps.toFixed(3) + " fps<br>";
+
+		t0 	   = t;
+		frames = 0;
+	}
+}
+
+ 
+function start() {
+    var canvas = document.getElementById("glcanvas");
+    initGL(canvas);
+    initShaders();
+ 
+	document.onkeydown 	= handleKeyDown;
+    document.onkeyup 	= handleKeyUp;
+
+	gear1 = new Gear(gl, 1.0, 4.0, 1.0, 20, 0.7, [0.8, 0.1, 0.0, 1.0]);
+	gear2 = new Gear(gl, 0.5, 2.0, 2.0, 10, 0.7, [0.0, 0.8, 0.2, 1.0]);
+	gear3 = new Gear(gl, 1.3, 2.0, 0.5, 10, 0.7, [0.2, 0.2, 1.0, 1.0]); 
+
+    setInterval(eventLoop, 1);
+/*
+	var f = function() {
+		eventLoop();
+		WebGLUtils.requestAnimationFrame(canvas, f);
+	};
+    f();
+*/
+}
+</script>
+</head>
+
+
+<style type="text/css"> 
+#glcanvas {
+	border: 2px solid black;
+	background-color: black;
+}
+</style> 
+
+<body onLoad="start()">
+	<div>
+		<h1>WebGL Gears</h1>
+		<p>Use the cursor keys to rotate</p>
+	</div>
+	<canvas id="glcanvas" width="300px" height="300px">
+		Your browser does not support the canvas element.
+	</canvas>
+	<div id="framerate"></div>
+</body>
+</html>

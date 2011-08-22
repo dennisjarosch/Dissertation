@@ -1,0 +1,43 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html>
+  <!--
+  Copyright (c) 2011, Dennis Jarosch. All rights reserved.
+  Use of this source code is governed by a BSD-style license that can be
+  found in the LICENSE file.
+  -->
+<head>
+<title>Native Client Gears</title>
+<script type="text/javascript">
+	gears = { };
+</script>
+<script type="text/javascript" src="gears.js"></script>
+</head>
+
+<body>
+<h1>Native Client Gears</h1>
+<div id="gears_content"></div>
+
+<script type="text/javascript">
+	function handleKeyDown(event) {
+		gears.application.module.keyDown(event.keyCode);
+	}
+
+	function handleKeyUp(event) {
+		gears.application.module.keyUp(event.keyCode);
+	}
+
+	// This function is called when the NaCl module is loaded.
+	function moduleDidLoad() {
+		var module = document.getElementById(gears.Application.MODULE_NAME);
+		gears.application.moduleDidLoad(module);
+
+		document.onkeydown 	= handleKeyDown;
+    	document.onkeyup 	= handleKeyUp;
+	}
+
+	gears.application = new gears.Application();
+	gears.application.run('gears_content');
+</script>
+
+</body>
+</html>
