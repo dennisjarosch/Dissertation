@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+  <!--
+  Copyright (c) 2011 Dennis Jarosch. All rights reserved.
+  Use of this source code is governed by a BSD-style license that can be
+  found in the LICENSE file.
+  -->
+<head>
+  <title>Native Client Pi</title>
+
+  <script type="text/javascript">
+    var pi 			= null;
+    var status_text = 'NO-STATUS';
+	var counter		= 1;
+
+    function moduleDidLoad() 
+	{
+		pi = document.getElementById('pi');
+		updateStatus('NaCl functions successfully loaded');
+    }
+
+    // If the page loads before the Native Client module loads, then set the
+    // status message indicating that the module is still loading.  Otherwise,
+    // do not change the status message.
+    function pageDidLoad() 
+	{
+      	if (pi == null)
+		{
+        	updateStatus('LOADING...');
+		}
+		else 
+		{
+		    // It's possible that the Native Client module onload event fired
+		    // before the page's onload event.  In this case, the status message
+		    // will reflect 'SUCCESS', but won't be displayed.  This call will
+		    // display the current message.
+		    updateStatus();
+		}
+    }
+
+    function calc() 
+	{
+		var iterations = parseInt(document.form.iterations.value);
+
+		var d = new Date();
+		var startTime = d.getTime();
+
+		var result = pi.calc(iterations);
+
+		var ed = new Date();
+		var duration = ed.getTime() - d.getTime();			
+
+//		updateStatus("pi is " + result + ", time was " + duration + " ms");
+
+		var status_field = document.getElementById('status_field');
+		status_field.innerHTML = status_field.innerHTML 
+			+ counter++ + ". pi is " + result + ", time was " + duration + " ms<br>";
+
+    }
+
+    // Set the global status message.  If the element with id 'status_field'
+    // exists, then set its HTML to the status message as well.
+    // opt_message The message test.  If this is null or undefined, then
+    //     attempt to set the element with id 'status_field' to the value of
+    //     |status_text|.
+    function updateStatus(opt_message) 
+	{
+		if (opt_message)
+	        status_text = opt_message;
+		
+		var status_field = document.getElementById('status_field');
+		if (status_field)
+	        status_field.innerHTML = status_text + "<br>";
+    }
+  </script>
+</head>
+<body onload="pageDidLoad()">
+
+<h1>Native Client Pi Generator</h1>
+<p>
+  <!-- For development, use a #develop location, which loads the develop
+  version of the module.
+  -->
+  <div id="content"></div>
+  <script type="text/javascript">
+    contentDiv = document.getElementById('content');
+    if (window.location.hash == '#develop') 
+	{
+      // Load the develop version of the module.
+      contentDiv.innerHTML = '<embed name="nacl_module" '
+                             + 'id="pi" '
+                             + 'width=0 height=0 '
+                             + 'type="pepper-application/pi" />';
+      moduleDidLoad();
+    } 
+	else 
+	{
+      // Load the published .nexe.  This includes the 'nexes' attribute which
+      // shows how to load multi-architecture modules.  Each entry in the
+      // table is a key-value pair: the key is the runtime ('x86-32',
+      // 'x86-64', etc.); the value is a URL for the desired NaCl module.
+      var nexes = 'x86-32: pi_x86_32.nexe\n'
+                  + 'x86-64: pi_x86_64.nexe\n'
+                  + 'ARM: pi_arm.nexe ';
+      contentDiv.innerHTML = '<embed name="nacl_module" '
+                             + 'id="pi" '
+                             + 'width=0 height=0 '
+                          // + 'nexes="' + nexes + '" '
+                             + 'type="application/x-nacl-srpc" '
+                             + 'onload=moduleDidLoad() />';
+      // Note: this code is here to work around a bug in Chromium build
+      // #47357.  See also
+      // http://code.google.com/p/nativeclient/issues/detail?id=500
+      document.getElementById('pi').nexes = nexes;
+    }
+  </script>
+</p>
+
+<form name="form">
+	<p>Iterations:</p>
+	<input type="text" size="15" name="iterations" value="100000000" />
+</form>
+
+<p>
+Click the Generate button to calculate pi.
+</p>
+
+<button onclick="calc()">Calculate</button>
+
+<h2>Status</h2>
+<div id="status_field">NO-STATUS</div>
+</body>
+</html>
