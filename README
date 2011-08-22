@@ -1,0 +1,13 @@
+This repository hosts the benchmarking code for the experiments in my dissertation. The four benchmarks are:
+
+1. pi: approximates pi using the Leibnitz formula
+
+2. pi_mt: approximates pi using the Leibnitz formula and threading
+
+3. gears: a port of glxgears to JavaScript and Native Client (NaCl)
+
+4. spectral: a spectral analysis of WAVE audio files
+
+Every benchmark consists of a C, JavaScript, and NaCl implementation, with the exception of the gears benchmarks that misses the original glxgears C implementation. The code is generally open source and the licensing information is provided in the license file, unless stated otherwise.
+
+The easiest way to compile and to run the NaCl benchmarks is to copy them directly to the examples sub-folder of the SDK. Please note that version 0.1.507 of the SDK is mandatory, due to its reliance on the NPAPI plugin interface that was dropped later. You will also need version 9 of the Chrome browser to run these experiments with the SDK.
