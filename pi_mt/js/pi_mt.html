@@ -1,0 +1,88 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html>
+  <!--
+  Copyright (c) 2011 Dennis Jarosch. All rights reserved.
+  Use of this source code is governed by a BSD-style license that can be
+  found in the LICENSE file.
+  -->
+<head>
+	<title>JavaScript Multi-Worker Pi Generator</title>
+
+	<script type="text/javascript">		
+		var d, pi;
+		var counter    = 1;
+		var loops      = 20;
+		var numWorkers = 2;
+		var worker     = new Array(numWorkers);
+		var results    = [];
+
+		function onResult(event) {
+			results.push(event.data);
+			pi += event.data;
+
+			if (results.length == numWorkers)
+			{
+				pi = pi * 4;			
+
+				var ed = new Date();
+				var duration = ed.getTime() - d.getTime();			
+
+				var result_field = document.getElementById('result_field');
+	//			result_field.innerHTML = "pi is " + event.data + ", time was " + duration + " ms<br>";
+				result_field.innerHTML = result_field.innerHTML 
+					+ counter++ + ". pi is " + pi + ", time was " + duration + " ms<br>";
+
+				document.body.style.cursor = "default";
+				results.length = 0;
+			}
+		}
+
+		function pageLoaded() {
+			for (var i = 0; i < numWorkers; i++)
+			{
+				worker[i] = new Worker("pi_mt.js");
+				worker[i].addEventListener("message", onResult, false);
+			}
+		}
+	
+		function calc() {
+			document.body.style.cursor = "wait";
+			pi = 0;
+
+			var iterations = parseInt(document.form.iterations.value) / numWorkers; 
+
+			// start timer
+			d = new Date();
+
+			// launch workers
+			var args = {};
+			for (var i = 0; i < numWorkers; i++)
+			{
+				args.from = i * iterations;
+				args.to   = args.from + iterations;
+
+				worker[i].postMessage(args);
+			}
+		}	
+	</script>
+
+</head>
+
+<body onload="pageLoaded()">
+	<h1>Multi-Worker Pi Generator</h1>
+    <form name="form">
+		<p>Iterations:</p>
+		<input type="text" size="15" name="iterations" value="100000000" />
+    </form>
+
+	<p>Cick on the button to generate pi.</p>
+	
+	<div id="button">
+		<button onclick="calc()">calculate</button>
+	</div>
+	
+	<h2>Status</h2>
+	<div id="result_field"></div>
+</body>
+</html>
