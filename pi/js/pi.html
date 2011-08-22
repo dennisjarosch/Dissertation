@@ -1,0 +1,88 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html>
+  <!--
+  Copyright (c) 2011 Dennis Jarosch. All rights reserved.
+  Use of this source code is governed by a BSD-style license that can be
+  found in the LICENSE file.
+  -->
+<head>
+	<title>JavaScript Pi Generator</title>
+
+	<script type="text/javascript">		
+		var d;
+		var counter = 1;
+		var loops   = 20;
+		var worker;
+
+/*
+		function pi() {
+			var result = 0;
+			var iterations = parseInt(document.form.iterations.value);
+
+			var d = new Date();
+			var startTime = d.getTime();
+
+			// implements the Leibnitz formula
+			for (var n = 0; n < iterations; n++) {
+				result +=  (1 - ((((n)) & 1) << 1)) / ((2 * n) + 1);
+			}
+
+			result = 4 *result;
+			var ed = new Date();
+			var duration = ed.getTime() - d.getTime();			
+
+			var result_field = document.getElementById('result_field');
+//	        result_field.innerHTML = "pi is " + result + ", time was " + duration + " ms";
+			result_field.innerHTML = result_field.innerHTML 
+				+ counter++ + ". pi is " + result + ", time was " + duration + " ms<br>";
+		} 
+*/
+
+		function onResult(event) {
+			var ed 		 = new Date();
+			var duration = ed.getTime() - d.getTime();			
+
+			var result_field = document.getElementById('result_field');
+//			result_field.innerHTML = "pi is " + event.data + ", time was " + duration + " ms<br>";
+			result_field.innerHTML = result_field.innerHTML 
+				+ counter++ + ". pi is " + event.data + ", time was " + duration + " ms<br>";
+
+			document.body.style.cursor = "default";
+		}
+
+		function pageLoaded() {
+			worker = new Worker("pi.js");
+			worker.addEventListener("message", onResult, false);			
+		}
+	
+		function calc() {
+			document.body.style.cursor = "wait";
+
+			var iterations = parseInt(document.form.iterations.value);
+
+			d = new Date();
+
+			worker.postMessage(iterations);		
+		}	
+	</script>
+
+</head>
+
+<body onload="pageLoaded()">
+	<h1>Pi Generator</h1>
+    <form name="form">
+		<p>Iterations:</p>
+		<input type="text" size="15" name="iterations" value="100000000" />
+    </form>
+
+	<p>Cick on the button to generate pi.</p>
+	
+	<div id="button">
+		<button onclick="calc()">calculate</button>
+	</div>
+	
+	<h2>Status</h2>
+	<div id="result_field"></div>
+</body>
+</html>
